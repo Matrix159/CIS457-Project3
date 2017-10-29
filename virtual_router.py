@@ -31,10 +31,11 @@ def main(argv):
 
         # Parse the ethernet header
         eth_header = packet[0][0:14]
+	
         eth_detailed = struct.unpack("!6s6s2s", eth_header)
-
+        
         arp_header = packet[0][14:42]
-        arp_detailed = struct.unpack("2s2s1s1s2s6s4s6s4s", arp_header)
+        arp_detailed = struct.unpack("!2s2s1s1s2s6s4s6s4s", arp_header)
 
         # skip non-ARP packets
         eth_type = eth_detailed[2]
@@ -92,8 +93,8 @@ def main(argv):
             new_arp_detailed_list[7] = arp_detailed[5]
 
             # fill in hex version of dest MAC
-            new_eth_detailed_list[1] = mactobinary(dest_MAC)
-            new_arp_detailed_list[5] = mactobinary(dest_MAC)
+            new_eth_detailed_list[1] = macToBinary(dest_MAC)
+            new_arp_detailed_list[5] = macToBinary(dest_MAC)
 
             # cast back to tuple -- might not be needed?
             new_eth_detailed = tuple(new_eth_detailed_list)
