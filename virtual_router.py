@@ -42,15 +42,15 @@ def main(argv):
 
         if eth_type == '\x08\x06':
             print "************************************************"    
-            print "****************_INCOMING_PACKET_***************"
-            print "****************_ARP_REQUEST_*******************"
+            print "**************** INCOMING PACKET ***************"
+            print "**************** ARP REQUEST *******************"
             print "************************************************"    
-            print "****************_ETHERNET_FRAME_****************"
+            print "**************** ETHERNET FRAME ****************"
             print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
             print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
             print "Type:            ", binascii.hexlify(eth_detailed[2])
             print "************************************************"
-            print "******************_ARP_HEADER_******************"
+            print "****************** ARP HEADER ******************"
             print "Hardware type:   ", binascii.hexlify(arp_detailed[0])
             print "Protocol type:   ", binascii.hexlify(arp_detailed[1])
             print "Hardware size:   ", binascii.hexlify(arp_detailed[2])
@@ -118,15 +118,15 @@ def main(argv):
             ethertype = ethernet_detailed[2]
 
             print "************************************************"    
-            print "****************_OUTGOING_PACKET_***************"
-            print "****************_ARP_REPLY_*********************"
+            print "**************** OUTGOING PACKET ***************"
+            print "**************** ARP REPLY *********************"
             print "************************************************"    
-            print "****************_ETHERNET_FRAME_****************"
+            print "**************** ETHERNET FRAME ****************"
             print "Dest MAC:        ", binascii.hexlify(ethernet_detailed[0])
             print "Source MAC:      ", binascii.hexlify(ethernet_detailed[1])
             print "Type:            ", binascii.hexlify(ethertype)
             print "************************************************"
-            print "******************_ARP_HEADER_******************"
+            print "****************** ARP HEADER ******************"
             print "Hardware type:   ", binascii.hexlify(arp_detailed[0])
             print "Protocol type:   ", binascii.hexlify(arp_detailed[1])
             print "Hardware size:   ", binascii.hexlify(arp_detailed[2])
@@ -145,7 +145,7 @@ def main(argv):
            
             #time.sleep(1)
         
-        elif eth_type != '\x08\x06':
+        elif eth_type == '\x08\x00':
             
             #icmp_packet = s.recvfrom(2048)
 
@@ -168,15 +168,15 @@ def main(argv):
             
             if ip_type == '\x00' and ip_protocol == '\x01':
                 print "************************************************"    
-                print "****************_INCOMING_PACKET_***************"
-                print "****************_ICMP_ECHO_REQUEST_*************"
+                print "**************** INCOMING PACKET ***************"
+                print "**************** ICMP ECHO REQUEST *************"
                 print "************************************************"    
-                print "****************_ETHERNET_FRAME_****************"
+                print "**************** ETHERNET FRAME ****************"
                 print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
                 print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
                 print "Type:            ", binascii.hexlify(eth_detailed[2])
                 print "************************************************"
-                print "****************_IP_HEADER_*********************"
+                print "**************** IP HEADER *********************"
                 print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
                 print "Type of service: ", binascii.hexlify(ip_detailed[1])
                 print "Length:          ", binascii.hexlify(ip_detailed[2])
@@ -188,7 +188,7 @@ def main(argv):
                 print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
                 print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
                 print "************************************************"
-                print "******************_ICMP_HEADER_*****************"
+                print "****************** ICMP HEADER *****************"
                 print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
                 print "Code:            ", binascii.hexlify(icmp_detailed[1])
                 print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
@@ -234,15 +234,15 @@ def main(argv):
                 icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
 
                 print "************************************************"    
-                print "****************_OUTGOING_PACKET_***************"
-                print "****************_ICMP_ECHO_REPLY_***************"
+                print "**************** OUTGOING PACKET ***************"
+                print "**************** ICMP ECHO REPLY ***************"
                 print "************************************************"
-                print "****************_ETHERNET_FRAME_****************"
+                print "**************** ETHERNET FRAME ****************"
                 print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
                 print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
                 print "Type:            ", binascii.hexlify(eth_detailed[2])
                 print "************************************************"
-                print "****************_IP_HEADER_*********************"
+                print "**************** IP HEADER *********************"
                 print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
                 print "Type of service: ", binascii.hexlify(ip_detailed[1])
                 print "Length:          ", binascii.hexlify(ip_detailed[2])
@@ -254,7 +254,7 @@ def main(argv):
                 print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
                 print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
                 print "************************************************"
-                print "******************_ICMP_HEADER_*****************"
+                print "****************** ICMP HEADER *****************"
                 print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
                 print "Code:            ", binascii.hexlify(icmp_detailed[1])
                 print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
