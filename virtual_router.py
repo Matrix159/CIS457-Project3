@@ -280,6 +280,8 @@ def main(argv):
             ip_protocol = ip_detailed[6]
             
             if ip_type == '\x00' and ip_protocol == '\x01':
+		print icmp_packet[1]
+		print binascii.hexlify(icmp_packet[1][4])
                 print "************************************************"    
                 print "**************** INCOMING PACKET ***************"
                 print "**************** ICMP ECHO REQUEST *************"
