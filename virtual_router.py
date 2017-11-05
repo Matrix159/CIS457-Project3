@@ -9,7 +9,16 @@ import netifaces
 import struct
 import binascii
 import time
+from uuid import getnode as get_mac #to get mac address
 
+
+ETH_P_ALL = 3
+global listIP1
+global listIP2
+global routerMAC
+
+r1SendSockets = []
+r2SendSockets = []
 
 def macToBinary(mac):
     """Convert MAC address to binary."""
@@ -47,12 +56,12 @@ def findNextHop(iplist, destIp):
 		if ipNumToMatch[1] == 16:
 			ipSplit = ipNumToMatch[0].split('.')
 			if ipSplit[0:2] == destIpSplit[0:2]:
-				# Return (IP to send on, interface to send on)
+				# Return (IP to send to, interface to send on)
 				return (splitEntry[1], splitEntry[2])
 		elif ipNumToMatch[1] == 24:
 			ipSplit = ipNumToMatch[0].split('.')
 			if ipSplit[0-2] == destIpSplit[0-2]:
-				# Return (IP to send on, interface to send on)
+				# Return (IP to send to, interface to send on)
 				return (splitEntry[1], splitEntry[2])
 	return None
 
@@ -67,7 +76,7 @@ def getRoutingList():
 	print listIP1
 	print listIP2
 	
-def makeARPRequest(ethSourceMAC, arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpSourceMAC, arpSourceIP, arpDestIP):
+def makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, arpDestIP):
 	'''
     "****************_ARP_REQUEST_*******************"
     "************************************************"    
@@ -88,37 +97,22 @@ def makeARPRequest(ethSourceMAC, arpHardwareType, arpProtocolType, arpHardwareSi
     "Dest IP:         ", socket.inet_ntoa(arp_detailed[8])
     "************************************************\n"    
 	'''
-	destMac = "\xFF\xFF\xFF\xFF\xFF\xFF"
+	destMAC = "\xFF\xFF\xFF\xFF\xFF\xFF"
 	ethType = "\x08\x06"
-	arpOpCode = "\x00\x01"
 	
+	arpHardwareType = "\x00\x01"
+	arpProtocolType = "\x08\x00"
+	arpHardwareSize = "\x06"
+	arpProtocolSize = "\x04"
+	arpOpCode = "\x00\x01"
+	arpDestinationMAC = "\x00\x00\x00\x00\x00\x00"
 	# pack back to binary
-	new_eth_header = struct.pack("6s6s2s", destMac, ethSourceMAC, ethType)
-	new_arp_header = struct.pack("2s2s1s1s2s6s4s6s4s", arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpOpCode, arpSourceMAC, arpSourceIP, arpDestIP)
+	new_eth_header = struct.pack("6s6s2s", destMAC, ethSourceMAC, ethType)
+	new_arp_header = struct.pack("2s2s1s1s2s6s4s6s4s", arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpOpCode, arpSourceMAC, arpSourceIP, arpDestinationMAC, arpDestIP)
 	
 	return new_eth_header + new_arp_header
 	
-"""
-Creates ARP header
-"""
-def makeArpHeader(reply, hwareType, pcType, hwareSize, pcSize, srcMac, srcIp, destMac, destIp):
 
-	if reply is True:
-		opCode = '\x00\x02'
-
-	#this is an ARP request
-	else:
-		opCode = '\x00\x01'
-		nextHop = findNextHop(listIP1, destIp)
-		if nextHop is None:
-			nextHop = findNextHop(listIP2, destIp)
-			#if nextHop is False: send error message.  Part three stuff
-			#TODO: Since this means we need to jump to r2's network, we need to do an ARP request
-
-	arpHeader = struct.pack("2s2s1s1s2s6s4s6s4s", hwareType, pcType, hwareSize, pcSize,
-		opCode , srcMac, srcIp, destMac, destIp)
-
-	return arpHeader
 	
 def main(argv):
     try: 
@@ -127,7 +121,60 @@ def main(argv):
     except socket.error as msg:
         print 'Socket could not be created. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
         sys.exit(-1)
+		
+	r1_interfaces = []
+	r2_interfaces = []
+	
+    print("Interfaces: {0}".format(str(netifaces.interfaces())))
+    for interface in netifaces.interfaces():
+        if interface[0:2] == "r1":
+            r1_interfaces.append(interface)
+		elif interface[0:2] == "r2"
+			r2_interfaces.append(interface)
 
+    print("Interfaces: {}".format(str(eth1_interfaces)))
+
+	# SETTING UP SEND SOCKETS
+    for i in r1_interfaces:
+        # get the addresses associated with this interface
+        address = ni.ifaddresses(i)
+        # get the packet address associated with it
+        eth1_packet_address = address[2][0]['addr']
+        print("eth1_packet_address: {}".format(str(eth1_packet_address)))
+
+        # python string interpolation
+        print("Creating socket on interface {}".format(i))
+
+        # create the packet socket
+        try:
+            SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
+        except:
+            print ('Socket could not be created')
+            sys.exit()
+        # bind the packet socket to this interface
+        SOCKFD.bind((i, 0))
+		r1SendSockets.append((SOCKFD, i))
+		
+	for i in r2_interfaces:
+        # get the addresses associated with this interface
+        address = ni.ifaddresses(i)
+        # get the packet address associated with it
+        eth1_packet_address = address[2][0]['addr']
+        print("eth1_packet_address: {}".format(str(eth1_packet_address)))
+
+        # python string interpolation
+        print("Creating socket on interface {}".format(i))
+
+        # create the packet socket
+        try:
+            SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
+        except:
+            print ('Socket could not be created')
+            sys.exit()
+        # bind the packet socket to this interface
+        SOCKFD.bind((i, 0))
+		r2SendSockets.append((SOCKFD, i))
+		
     while True:
 
         # Receive packets with a buffer size of 1024 bytes
@@ -138,6 +185,7 @@ def main(argv):
 	
         eth_detailed = struct.unpack("!6s6s2s", eth_header)
         
+		routerMAC = 
         arp_header = packet[0][14:42]
         arp_detailed = struct.unpack("!2s2s1s1s2s6s4s6s4s", arp_header)
 
@@ -310,6 +358,30 @@ def main(argv):
                 print "Header data:     ", binascii.hexlify(icmp_detailed[3])
                 print "************************************************\n"    
                 
+				# Check if we need to ARP request against the other router
+				nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9])
+				if nextHop == None:
+					nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9])
+				if(nextHop not None and nextHop[0] != "-"):
+					if(len(r2SendSockets) == 0):
+						ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
+						arpSourceMAC = ethSourceMAC
+						arpSourceIP = s.gethostbyname(gethostname())
+						
+						arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
+						for socket in r1SendSockets:
+							if socket[1] == nextHop[1]:
+								socket[0].send(arpPacket)
+					else:
+						ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
+						arpSourceMAC = ethSourceMAC
+						arpSourceIP = s.gethostbyname(gethostname())
+						
+						arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
+						for socket in r2SendSockets:
+							if socket[1] == nextHop[1]:
+								socket[0].send(arpPacket)
+
                 # tuples are immutable in python, copy to list
                 new_eth_detailed_list = list(eth_detailed)
                 new_ip_detailed_list = list(ip_detailed)
@@ -381,4 +453,6 @@ def main(argv):
                 s.sendto(new_icmp_packet, icmp_packet[1])
 
 if __name__ == "__main__":
+	getRoutingList()
     main(sys.argv)
+	
