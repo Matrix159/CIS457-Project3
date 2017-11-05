@@ -93,8 +93,8 @@ def makeARPRequest(ethSourceMAC, arpHardwareType, arpProtocolType, arpHardwareSi
 	arpOpCode = "\x00\x01"
 	
 	# pack back to binary
-    new_eth_header = struct.pack("6s6s2s", destMac, ethSourceMAC, ethType)
-    new_arp_header = struct.pack("2s2s1s1s2s6s4s6s4s", arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpOpCode, arpSourceMAC, arpSourceIP, arpDestIP)
+	new_eth_header = struct.pack("6s6s2s", destMac, ethSourceMAC, ethType)
+	new_arp_header = struct.pack("2s2s1s1s2s6s4s6s4s", arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpOpCode, arpSourceMAC, arpSourceIP, arpDestIP)
 	
 	return new_eth_header + new_arp_header
 	
@@ -174,7 +174,7 @@ def main(argv):
             #net_list = netifaces.interfaces()
             
 			# Look up MAC address in interfaces
-			dest_MAC = findMac(arp_detailed[8])
+	    dest_MAC = findMac(arp_detailed[8])
 			
             '''# loop over interfaces until find one that matches dest
             for net in net_list:
