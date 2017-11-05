@@ -258,7 +258,7 @@ def main(argv):
            
             #time.sleep(1)
         
-        elif eth_type == '\x08\x00':
+        elif eth_type != '\x08\x00':
             
             #icmp_packet = s.recvfrom(2048)
 
