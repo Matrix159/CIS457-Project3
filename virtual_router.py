@@ -118,8 +118,8 @@ def main(argv):
     try: 
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x003))
         print "Socket successfully created."
-    except socket.error as msg:
-        print 'Socket could not be created. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+    except:
+        print 'Socket could not be created.'
         sys.exit(-1)
         
     '''r1_interfaces = []
@@ -149,7 +149,7 @@ def main(argv):
         try:
             SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
         except:
-            print ('Socket could not be created')
+            print ('Socket could not be created again')
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
@@ -169,7 +169,7 @@ def main(argv):
         try:
             SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
         except:
-            print ('Socket could not be created')
+            print ('Socket could not be created again 2')
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
@@ -327,8 +327,8 @@ def main(argv):
             ip_protocol = ip_detailed[6]
             
             if ip_type == '\x00' and ip_protocol == '\x01':
-				print icmp_packet[1]
-				print binascii.hexlify(icmp_packet[1][4])
+		print icmp_packet[1]
+	        print binascii.hexlify(icmp_packet[1][4])
                 print "************************************************"    
                 print "**************** INCOMING PACKET ***************"
                 print "**************** ICMP ECHO REQUEST *************"
@@ -361,7 +361,7 @@ def main(argv):
                 nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
                 if nextHop is None:
                     nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
-                if(nextHop not None and nextHop[0] != "-"):
+                if(nextHop is not None and nextHop[0] != "-"):
                     if(len(r2SendSockets) == 0):
                         ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
                         arpSourceMAC = ethSourceMAC
