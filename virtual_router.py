@@ -71,10 +71,14 @@ gets routing tables and puts them into lists
 def getRoutingList():
     table1 = open("r1-table.txt", "r")
     table2 = open("r2-table.txt", "r")
-    listIP1 = table1.read().split("\n")
-    listIP2 = table2.read().split("\n")
-    print listIP1
-    print listIP2
+    try:
+        listIP1 = table1.read().split("\n")
+        listIP2 = table2.read().split("\n")
+        print listIP1
+        print listIP2
+	finally:
+	    table1.close()
+		table2.close()
     
 def makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, arpDestIP):
     '''
@@ -327,8 +331,8 @@ def main(argv):
             ip_protocol = ip_detailed[6]
             
             if ip_type == '\x00' and ip_protocol == '\x01':
-		print icmp_packet[1]
-	        print binascii.hexlify(icmp_packet[1][4])
+		        print icmp_packet[1]
+	            print binascii.hexlify(icmp_packet[1][4])
                 print "************************************************"    
                 print "**************** INCOMING PACKET ***************"
                 print "**************** ICMP ECHO REQUEST *************"
