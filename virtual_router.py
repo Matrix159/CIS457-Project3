@@ -185,7 +185,6 @@ def main(argv):
     
         eth_detailed = struct.unpack("!6s6s2s", eth_header)
         
-        routerMAC = 
         arp_header = packet[0][14:42]
         arp_detailed = struct.unpack("!2s2s1s1s2s6s4s6s4s", arp_header)
 
