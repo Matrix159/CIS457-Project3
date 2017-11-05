@@ -129,7 +129,7 @@ def main(argv):
     for interface in netifaces.interfaces():
         if interface[0:2] == "r1":
             r1_interfaces.append(interface)
-        elif interface[0:2] == "r2"
+        elif interface[0:2] == "r2":
             r2_interfaces.append(interface)
 
     print("Interfaces: {}".format(str(eth1_interfaces)))
