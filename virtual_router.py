@@ -118,8 +118,8 @@ def main(argv):
     try: 
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x003))
         print "Socket successfully created."
-    except socket.error as msg:
-        print 'Socket could not be created. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+    except:
+        print 'Socket could not be created.'
         sys.exit(-1)
         
     r1_interfaces = []
@@ -149,7 +149,7 @@ def main(argv):
         try:
             SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
         except:
-            print ('Socket could not be created')
+            print ('Socket could not be created again')
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
@@ -169,7 +169,7 @@ def main(argv):
         try:
             SOCKFD = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETH_P_ALL))
         except:
-            print ('Socket could not be created')
+            print ('Socket could not be created again 2')
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
