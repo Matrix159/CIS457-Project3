@@ -174,7 +174,7 @@ def main(argv):
             #net_list = netifaces.interfaces()
             
 			# Look up MAC address in interfaces
-			dest_MAC = findMac(dest_IP)
+            dest_MAC = findMac(dest_IP)
 			
             '''# loop over interfaces until find one that matches dest
             for net in net_list:
