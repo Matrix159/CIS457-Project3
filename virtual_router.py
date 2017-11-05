@@ -327,8 +327,8 @@ def main(argv):
             ip_protocol = ip_detailed[6]
             
             if ip_type == '\x00' and ip_protocol == '\x01':
-        print icmp_packet[1]
-        print binascii.hexlify(icmp_packet[1][4])
+				print icmp_packet[1]
+				print binascii.hexlify(icmp_packet[1][4])
                 print "************************************************"    
                 print "**************** INCOMING PACKET ***************"
                 print "**************** ICMP ECHO REQUEST *************"
@@ -358,9 +358,9 @@ def main(argv):
                 print "************************************************\n"    
                 
                 # Check if we need to ARP request against the other router
-                nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9])
-                if nextHop == None:
-                    nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9])
+                nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
+                if nextHop is None:
+                    nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
                 if(nextHop not None and nextHop[0] != "-"):
                     if(len(r2SendSockets) == 0):
                         ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
