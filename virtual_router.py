@@ -122,7 +122,7 @@ def main(argv):
         print 'Socket could not be created. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
         sys.exit(-1)
         
-    r1_interfaces = []
+    '''r1_interfaces = []
     r2_interfaces = []
     
     print("Interfaces: {0}".format(str(netifaces.interfaces())))
@@ -173,7 +173,7 @@ def main(argv):
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
-        r2SendSockets.append((SOCKFD, i))
+        r2SendSockets.append((SOCKFD, i))'''
         
     while True:
 
