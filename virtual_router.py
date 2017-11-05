@@ -174,7 +174,7 @@ def main(argv):
             #net_list = netifaces.interfaces()
             
 			# Look up MAC address in interfaces
-			dest_MAC = findMac(dest_IP)
+			dest_MAC = findMac(arp_detailed[8])
 			
             '''# loop over interfaces until find one that matches dest
             for net in net_list:
@@ -206,8 +206,8 @@ def main(argv):
             new_arp_detailed_list[7] = arp_detailed[5]
 
             # fill in hex version of dest MAC
-            new_eth_detailed_list[1] = macToBinary(dest_MAC)
-            new_arp_detailed_list[5] = macToBinary(dest_MAC)
+            new_eth_detailed_list[1] = dest_MAC
+            new_arp_detailed_list[5] = dest_MAC
 
             # cast back to tuple -- might not be needed?
             new_eth_detailed = tuple(new_eth_detailed_list)
