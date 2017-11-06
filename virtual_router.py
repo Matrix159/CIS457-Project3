@@ -218,7 +218,9 @@ def main(argv):
             print "Dest MAC:        ", binascii.hexlify(arp_detailed[7])
             print "Dest IP:         ", socket.inet_ntoa(arp_detailed[8])
             print "************************************************\n"    
-
+            if arp_detailed[4] == '\x00\x02':
+		print arp_detailed[5]
+                continue
             # strings for ip addresses
             source_IP = socket.inet_ntoa(arp_detailed[6])
             dest_IP = socket.inet_ntoa(arp_detailed[8])
@@ -372,22 +374,23 @@ def main(argv):
                         
                         ethSourceMAC = eth_detailed[0]
                         arpSourceMAC = ethSourceMAC
-                        arpSourceIP = s.gethostbyname(s.gethostname())
+                        arpSourceIP = '10.0.0.1'
                         
-                        arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
-                        for socket in r1SendSockets:
-                            if socket[1] == nextHop[1]:
-                                socket[0].send(arpPacket)
+                        arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
+                        for socket1 in r1SendSockets:
+                            if socket1[1] == nextHop[1]:
+                                socket1[0].send(arpPacket)
                     else:
                         ethSourceMAC = eth_detailed[0]
                         arpSourceMAC = ethSourceMAC
-                        arpSourceIP = s.gethostbyname(s.gethostname())
+                        arpSourceIP = '10.0.0.2'
                         
-                        arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
-                        for socket in r2SendSockets:
-                            if socket[1] == nextHop[1]:
-                                socket[0].send(arpPacket)
+                        arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
+                        for socket2 in r2SendSockets:
+                            if socket2[1] == nextHop[1]:
+                                socket2[0].send(arpPacket)
 
+                continue
                 # tuples are immutable in python, copy to list
                 new_eth_detailed_list = list(eth_detailed)
                 new_ip_detailed_list = list(ip_detailed)
