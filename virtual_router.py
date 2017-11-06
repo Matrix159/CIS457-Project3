@@ -13,9 +13,8 @@ from uuid import getnode as get_mac #to get mac address
 
 
 ETH_P_ALL = 3
-global listIP1
-global listIP2
-global routerMAC
+listIP1 = []
+listIP2 = []
 
 r1SendSockets = []
 r2SendSockets = []
@@ -46,21 +45,21 @@ def findMac(IP):
 """
 find next hop
 """
-def findNextHop(iplist, destIp):
+def findNextHop(iplist, destIP):
     for entry in iplist:
         splitEntry = entry.split(" ")
         ipNumToMatch = splitEntry[0].split('/')
-        destIpSplit = destIP.split('.')
+        destIPSplit = destIP.split('.')
 
         #checking 16 and 24 bit patterns
-        if ipNumToMatch[1] == 16:
+        if int(ipNumToMatch[1]) == 16:
             ipSplit = ipNumToMatch[0].split('.')
-            if ipSplit[0:2] == destIpSplit[0:2]:
+            if ipSplit[0:2] == destIPSplit[0:2]:
                 # Return (IP to send to, interface to send on)
                 return (splitEntry[1], splitEntry[2])
-        elif ipNumToMatch[1] == 24:
+        elif int(ipNumToMatch[1]) == 24:
             ipSplit = ipNumToMatch[0].split('.')
-            if ipSplit[0-2] == destIpSplit[0-2]:
+            if ipSplit[0:3] == destIPSplit[0:3]:
                 # Return (IP to send to, interface to send on)
                 return (splitEntry[1], splitEntry[2])
     return None
@@ -71,8 +70,10 @@ gets routing tables and puts them into lists
 def getRoutingList():
     table1 = open("r1-table.txt", "r")
     table2 = open("r2-table.txt", "r")
-    listIP1 = table1.read().split("\n")
-    listIP2 = table2.read().split("\n")
+    global listIP1
+    global listIP2
+    listIP1 = filter(None, table1.read().split("\n"))
+    listIP2 = filter(None, table2.read().split("\n"))
     print listIP1
     print listIP2
     table1.close()
@@ -118,13 +119,14 @@ def makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, arpDestIP):
     
 def main(argv):
     try: 
+        global socket
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x003))
         print "Socket successfully created."
     except:
         print 'Socket could not be created.'
         sys.exit(-1)
         
-    '''r1_interfaces = []
+    r1_interfaces = []
     r2_interfaces = []
     
     print("Interfaces: {0}".format(str(netifaces.interfaces())))
@@ -134,12 +136,12 @@ def main(argv):
         elif interface[0:2] == "r2":
             r2_interfaces.append(interface)
 
-    print("Interfaces: {}".format(str(eth1_interfaces)))
+    # print("Interfaces: {}".format(str(eth1_interfaces)))
 
     # SETTING UP SEND SOCKETS
     for i in r1_interfaces:
         # get the addresses associated with this interface
-        address = ni.ifaddresses(i)
+        address = netifaces.ifaddresses(i)
         # get the packet address associated with it
         eth1_packet_address = address[2][0]['addr']
         print("eth1_packet_address: {}".format(str(eth1_packet_address)))
@@ -155,11 +157,12 @@ def main(argv):
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
+        global r1SendSockets
         r1SendSockets.append((SOCKFD, i))
         
     for i in r2_interfaces:
         # get the addresses associated with this interface
-        address = ni.ifaddresses(i)
+        address = netifaces.ifaddresses(i)
         # get the packet address associated with it
         eth1_packet_address = address[2][0]['addr']
         print("eth1_packet_address: {}".format(str(eth1_packet_address)))
@@ -175,7 +178,8 @@ def main(argv):
             sys.exit()
         # bind the packet socket to this interface
         SOCKFD.bind((i, 0))
-        r2SendSockets.append((SOCKFD, i))'''
+        global r2SendSockets
+        r2SendSockets.append((SOCKFD, i))
         
     while True:
 
@@ -365,18 +369,19 @@ def main(argv):
                     nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
                 if(nextHop is not None and nextHop[0] != "-"):
                     if(len(r2SendSockets) == 0):
-                        ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
+                        
+                        ethSourceMAC = eth_detailed[0]
                         arpSourceMAC = ethSourceMAC
-                        arpSourceIP = s.gethostbyname(gethostname())
+                        arpSourceIP = s.gethostbyname(s.gethostname())
                         
                         arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
                         for socket in r1SendSockets:
                             if socket[1] == nextHop[1]:
                                 socket[0].send(arpPacket)
                     else:
-                        ethSourceMAC = binascii.unhexlify(hex(get_mac())[2:])
+                        ethSourceMAC = eth_detailed[0]
                         arpSourceMAC = ethSourceMAC
-                        arpSourceIP = s.gethostbyname(gethostname())
+                        arpSourceIP = s.gethostbyname(s.gethostname())
                         
                         arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, socket.inet_aton(arpSourceIP))
                         for socket in r2SendSockets:
