@@ -217,10 +217,18 @@ def main(argv):
             print "Source IP:       ", socket.inet_ntoa(arp_detailed[6])
             print "Dest MAC:        ", binascii.hexlify(arp_detailed[7])
             print "Dest IP:         ", socket.inet_ntoa(arp_detailed[8])
-            print "************************************************\n"    
-            if arp_detailed[4] == '\x00\x02':
-		print arp_detailed[5]
+            print "************************************************\n"
+            # If we are router 1 and destination IP of arp is not us continue
+            router1List = ['10.1.0.1', '10.1.1.1', '10.0.0.1']
+            if(len(r2SendSockets) == 0 and socket.inet_ntoa(arp_detailed[8]) not in router1List):
                 continue
+            # If we are router 2 and destination IP of arp is not us continue
+            router2List = ['10.3.0.1', '10.3.1.1', '10.3.4.1', '10.0.0.2']
+            if(len(r1SendSockets) == 0 and socket.inet_ntoa(arp_detailed[8]) not in router2List ):
+                continue    
+            if arp_detailed[4] == '\x00\x02':
+		print "MAC ADDRESS OF THE OTHER SIDE: " + binascii.hexlify(arp_detailed[5])
+                break
             # strings for ip addresses
             source_IP = socket.inet_ntoa(arp_detailed[6])
             dest_IP = socket.inet_ntoa(arp_detailed[8])
