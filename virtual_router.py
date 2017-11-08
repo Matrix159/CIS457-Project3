@@ -15,7 +15,7 @@ from uuid import getnode as get_mac #to get mac address
 ETH_P_ALL = 3
 listIP1 = []
 listIP2 = []
-
+isRouterOne = None
 r1SendSockets = []
 r2SendSockets = []
 
@@ -23,29 +23,26 @@ def macToBinary(mac):
     """Convert MAC address to binary."""
     return binascii.unhexlify(mac.replace(':', ''))
 
-"""
-Finds MAC address of requested IP
-"""
 def findMac(IP):
+    """Finds MAC address of requested IP"""
+
     #obtain list of addresses on the network
     networkList = netifaces.interfaces()
     print networkList
     for iface in networkList:
         addr = netifaces.ifaddresses(iface)[2][0]['addr']
+        # Of format "aa:bb:cc:dd:ee:ff"
         mac = netifaces.ifaddresses(iface)[17][0]['addr']
         print addr
         print mac
-        #print socket.inet_ntoa(targetIP)
         if addr == IP:
             return mac
-    print  "MAC_NOT_FOUND"
-    return "MAC_NOT_FOUND"
+    print "MAC_NOT_FOUND"
+    return None
     
-    
-"""
-find next hop
-"""
+
 def findNextHop(iplist, destIP):
+    """Find next hop"""
     for entry in iplist:
         splitEntry = entry.split(" ")
         ipNumToMatch = splitEntry[0].split('/')
@@ -64,20 +61,20 @@ def findNextHop(iplist, destIP):
                 return (splitEntry[1], splitEntry[2])
     return None
 
-"""
-gets routing tables and puts them into lists
-"""
-def getRoutingList():
-    table1 = open("r1-table.txt", "r")
-    table2 = open("r2-table.txt", "r")
+
+def getRoutingList(isRouterOne):
+    """Gets routing tables and puts them into lists"""
     global listIP1
     global listIP2
-    listIP1 = filter(None, table1.read().split("\n"))
-    listIP2 = filter(None, table2.read().split("\n"))
-    print listIP1
-    print listIP2
-    table1.close()
-    table2.close()
+    
+    if isRouterOne:
+        table1 = open("r1-table.txt", "r")
+        listIP1 = filter(None, table1.read().split("\n"))
+        table1.close()
+    else:
+        table2 = open("r2-table.txt", "r")
+        listIP2 = filter(None, table2.read().split("\n"))
+        table2.close()
     
 def makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, arpDestIP):
     '''
@@ -114,12 +111,33 @@ def makeARPRequest(ethSourceMAC, arpSourceMAC, arpSourceIP, arpDestIP):
     new_arp_header = struct.pack("2s2s1s1s2s6s4s6s4s", arpHardwareType, arpProtocolType, arpHardwareSize, arpProtocolSize, arpOpCode, arpSourceMAC, arpSourceIP, arpDestinationMAC, arpDestIP)
     
     return new_eth_header + new_arp_header
-    
 
+
+def checkIsArpPacket(arpBinary):
+    '''Check to see if packet is of type arp'''
+    # Parse the ethernet header
+    eth_header = packet[0][0:14]
+    eth_detailed = struct.unpack("!6s6s2s", eth_header)
+    eth_type = eth_detailed[2]
     
+    if eth_type == '\x08\x06':
+        return True
+    else:
+        return False
+
+def processArpPacket(arpBinary): 
+    return None
+
 def main(argv):
+
+    global isRouterOne
+    global socket
+    global listIP1
+    global listIP2
+    global r1SendSockets
+    global r2SendSockets
+
     try: 
-        global socket
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x003))
         print "Socket successfully created."
     except:
@@ -186,6 +204,7 @@ def main(argv):
         # Receive packets with a buffer size of 1024 bytes
         packet = s.recvfrom(1024)
 
+        isArpPacket = checkIsArpPacket(packet)
         # Parse the ethernet header
         eth_header = packet[0][0:14]
     
@@ -227,7 +246,7 @@ def main(argv):
             if(len(r1SendSockets) == 0 and socket.inet_ntoa(arp_detailed[8]) not in router2List ):
                 continue    
             if arp_detailed[4] == '\x00\x02':
-		print "MAC ADDRESS OF THE OTHER SIDE: " + binascii.hexlify(arp_detailed[5])
+                print "MAC ADDRESS OF THE OTHER SIDE: " + binascii.hexlify(arp_detailed[5])
                 break
             # strings for ip addresses
             source_IP = socket.inet_ntoa(arp_detailed[6])
@@ -470,6 +489,17 @@ def main(argv):
                 s.sendto(new_icmp_packet, icmp_packet[1])
 
 if __name__ == "__main__":
-    getRoutingList()
-    main(sys.argv)
+    global isRouterOne
+    if(len(sys.argv) != 2):
+        print "Incorrect command line argument length."
+    if(sys.argv[1] == "r1"):
+        isRouterOne = True
+        getRoutingList(True)
+        main(sys.argv)
+    elif(sys.argv[1] == "r2"):
+        isRouterOne = False
+        getRoutingList(False)
+        main(sys.argv)
+ 
+    
     
