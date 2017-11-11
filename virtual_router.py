@@ -166,7 +166,7 @@ def processArpPacket(packet):
         return None
     # If we are router 2 and destination IP of arp is not us continue
     router2List = ['10.3.0.1', '10.3.1.1', '10.3.4.1', '10.0.0.2']
-    if(!isRouterOne and socket.inet_ntoa(arp_detailed[8]) not in router2List ):
+    if(not isRouterOne and socket.inet_ntoa(arp_detailed[8]) not in router2List ):
         return None    
     # If this is an ARP reply packet
     if arp_detailed[4] == '\x00\x02':
@@ -250,8 +250,8 @@ def processICMPPacket(packet):
     
     ip_header = icmp_packet[0][14:34]
     ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
-	
-	# TODO: Test this out
+    
+    # TODO: Test this out
     #ip_ver, ip_type, ip_len, ip_id, ip_flags, ip_ttl, ip_proto, \
     #    ip_checksum, ip_srcIP, ip_destIP = struct.unpack("!BBHHHBBHII", ip_header)
     
@@ -262,133 +262,162 @@ def processICMPPacket(packet):
     ip_type = ip_detailed[1]
     ip_protocol = ip_detailed[6]
     
-    print icmp_packet[1]
-	print binascii.hexlify(icmp_packet[1][4])
-	print "************************************************"    
-	print "**************** INCOMING PACKET ***************"
-	print "**************** ICMP ECHO REQUEST *************"
-	print "************************************************"    
-	print "**************** ETHERNET FRAME ****************"
-	print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
-	print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
-	print "Type:            ", binascii.hexlify(eth_detailed[2])
-	print "************************************************"
-	print "**************** IP HEADER *********************"
-	print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
-	print "Type of service: ", binascii.hexlify(ip_detailed[1])
-	print "Length:          ", binascii.hexlify(ip_detailed[2])
-	print "Identification:  ", binascii.hexlify(ip_detailed[3])
-	print "Flags/offset:    ", binascii.hexlify(ip_detailed[4])
-	print "Time to Live:    ", binascii.hexlify(ip_detailed[5])
-	print "Protocol:        ", binascii.hexlify(ip_detailed[6])
-	print "Checksum:        ", binascii.hexlify(ip_detailed[7])
-	print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
-	print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
-	print "************************************************"
-	print "****************** ICMP HEADER *****************"
-	print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
-	print "Code:            ", binascii.hexlify(icmp_detailed[1])
-	print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
-	print "Header data:     ", binascii.hexlify(icmp_detailed[3])
-	print "************************************************\n"    
-	
-	# Check if we need to ARP request against the other router
-	if(isRouterOne):
-		nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
-	else:
-		nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
-	if(nextHop is not None and nextHop[0] != "-"):
-		if(isRouterOne):
-			ethSourceMAC = eth_detailed[0]
-			arpSourceMAC = ethSourceMAC
-			
-			# TODO: Remove this hardcoded value, this can change based on what interface we are sending on
-			arpSourceIP = '10.0.0.1'
-			
-			arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
-			for socket1 in r1SendSockets:
-				# If socket interface == next hop interface
-				if socket1[1] == nextHop[1]:
-					socket1[0].send(arpPacket)
-		else:
-			ethSourceMAC = eth_detailed[0]
-			arpSourceMAC = ethSourceMAC
-			# TODO: Remove this hardcoded value, this can change based on what interface we are sending on
-			arpSourceIP = '10.0.0.2'
-			
-			arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
-			for socket2 in r2SendSockets:
-				# If socket interface == next hop interface
-				if socket2[1] == nextHop[1]:
-					socket2[0].send(arpPacket)
-	
-	#continue
-	# tuples are immutable in python, copy to list
-	new_eth_detailed_list = list(eth_detailed)
-	new_ip_detailed_list = list(ip_detailed)
-	new_icmp_detailed_list = list(icmp_detailed)
-	
-	# swap IPs
-	new_ip_detailed_list[8] = ip_detailed[9]
-	new_ip_detailed_list[9] = ip_detailed[8]
-	
-	# swap MACs
-	new_eth_detailed_list[0] = eth_detailed[1]
-	new_eth_detailed_list[1] = eth_detailed[0]
-	
-	# change type of msg
-	new_icmp_detailed_list[0] = '\x00'
-	
-	# cast back to tuple -- might not be needed?
-	new_eth_detailed = tuple(new_eth_detailed_list)
-	new_ip_detailed = tuple(new_ip_detailed_list)
-	new_icmp_detailed = tuple(new_icmp_detailed_list)
-	
-	# pack back to binary
-	new_eth_header = struct.pack("6s6s2s", *new_eth_detailed)
-	new_ip_header = struct.pack("1s1s2s2s2s1s1s2s4s4s", *new_ip_detailed)
-	new_icmp_header = struct.pack("1s1s2s4s", *new_icmp_detailed)
-	
-	# combine eth, ip, and icmp headers and icmp data
-	new_icmp_packet = new_eth_header + new_ip_header + new_icmp_header + icmp_packet[0][42:]
-	
-	eth_header = new_icmp_packet[0:14]
-	eth_detailed = struct.unpack("!6s6s2s", eth_header)
-	
-	ip_header = new_icmp_packet[14:34]
-	ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
-	
-	icmp_header = new_icmp_packet[34:42]
-	icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
-	
-	print "************************************************"    
-	print "**************** OUTGOING PACKET ***************"
-	print "**************** ICMP ECHO REPLY ***************"
-	print "************************************************"
-	print "**************** ETHERNET FRAME ****************"
-	print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
-	print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
-	print "Type:            ", binascii.hexlify(eth_detailed[2])
-	print "************************************************"
-	print "**************** IP HEADER *********************"
-	print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
-	print "Type of service: ", binascii.hexlify(ip_detailed[1])
-	print "Length:          ", binascii.hexlify(ip_detailed[2])
-	print "Identification:  ", binascii.hexlify(ip_detailed[3])
-	print "Flags/offset:    ", binascii.hexlify(ip_detailed[4])
-	print "Time to Live:    ", binascii.hexlify(ip_detailed[5])
-	print "Protocol:        ", binascii.hexlify(ip_detailed[6])
-	print "Checksum:        ", binascii.hexlify(ip_detailed[7])
-	print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
-	print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
-	print "************************************************"
-	print "****************** ICMP HEADER *****************"
-	print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
-	print "Code:            ", binascii.hexlify(icmp_detailed[1])
-	print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
-	print "Header data:     ", binascii.hexlify(icmp_detailed[3])
-	print "************************************************\n"
+    #print icmp_packet[1]
+    #print binascii.hexlify(icmp_packet[1][4])
+    print "************************************************"    
+    print "**************** INCOMING PACKET ***************"
+    print "**************** ICMP ECHO REQUEST *************"
+    print "************************************************"    
+    print "**************** ETHERNET FRAME ****************"
+    print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
+    print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
+    print "Type:            ", binascii.hexlify(eth_detailed[2])
+    print "************************************************"
+    print "**************** IP HEADER *********************"
+    print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
+    print "Type of service: ", binascii.hexlify(ip_detailed[1])
+    print "Length:          ", binascii.hexlify(ip_detailed[2])
+    print "Identification:  ", binascii.hexlify(ip_detailed[3])
+    print "Flags/offset:    ", binascii.hexlify(ip_detailed[4])
+    print "Time to Live:    ", binascii.hexlify(ip_detailed[5])
+    print "Protocol:        ", binascii.hexlify(ip_detailed[6])
+    print "Checksum:        ", binascii.hexlify(ip_detailed[7])
+    print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
+    print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
+    print "************************************************"
+    print "****************** ICMP HEADER *****************"
+    print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
+    print "Code:            ", binascii.hexlify(icmp_detailed[1])
+    print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
+    print "Header data:     ", binascii.hexlify(icmp_detailed[3])
+    print "************************************************\n"    
+    
+    # Check if we need to ARP request against the other router
+    if(isRouterOne):
+        nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
+    else:
+        nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
+    if(nextHop is not None and nextHop[0] != "-"):
+        if(isRouterOne):
+            ethSourceMAC = eth_detailed[0]
+            arpSourceMAC = ethSourceMAC
+            
+            # TODO: Remove this hardcoded value, this can change based on what interface we are sending on
+            arpSourceIP = '10.0.0.1'
+            
+            arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
+            for socket1 in r1SendSockets:
+                # If socket interface == next hop interface
+                if socket1[1] == nextHop[1]:
+                    socket1[0].send(arpPacket)
+        else:
+            ethSourceMAC = eth_detailed[0]
+            arpSourceMAC = ethSourceMAC
+            # TODO: Remove this hardcoded value, this can change based on what interface we are sending on
+            arpSourceIP = '10.0.0.2'
+            
+            arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
+            for socket2 in r2SendSockets:
+                # If socket interface == next hop interface
+                if socket2[1] == nextHop[1]:
+                    socket2[0].send(arpPacket)
+    
+    #continue
+    # tuples are immutable in python, copy to list
+    new_eth_detailed_list = list(eth_detailed)
+    new_ip_detailed_list = list(ip_detailed)
+    new_icmp_detailed_list = list(icmp_detailed)
+    
+    # swap IPs
+    new_ip_detailed_list[8] = ip_detailed[9]
+    new_ip_detailed_list[9] = ip_detailed[8]
+    
+    # swap MACs
+    new_eth_detailed_list[0] = eth_detailed[1]
+    new_eth_detailed_list[1] = eth_detailed[0]
+    
+    # change type of msg
+    new_icmp_detailed_list[0] = '\x00'
+    
+    # cast back to tuple -- might not be needed?
+    new_eth_detailed = tuple(new_eth_detailed_list)
+    new_ip_detailed = tuple(new_ip_detailed_list)
+    new_icmp_detailed = tuple(new_icmp_detailed_list)
+    
+    # pack back to binary
+    new_eth_header = struct.pack("6s6s2s", *new_eth_detailed)
+    new_ip_header = struct.pack("1s1s2s2s2s1s1s2s4s4s", *new_ip_detailed)
+    new_icmp_header = struct.pack("1s1s2s4s", *new_icmp_detailed)
+    
+    # combine eth, ip, and icmp headers and icmp data
+    new_icmp_packet = new_eth_header + new_ip_header + new_icmp_header + icmp_packet[0][42:]
+    
+    eth_header = new_icmp_packet[0:14]
+    eth_detailed = struct.unpack("!6s6s2s", eth_header)
+    
+    ip_header = new_icmp_packet[14:34]
+    ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
+    
+    icmp_header = new_icmp_packet[34:42]
+    icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
+    
+    print "************************************************"    
+    print "**************** OUTGOING PACKET ***************"
+    print "**************** ICMP ECHO REPLY ***************"
+    print "************************************************"
+    print "**************** ETHERNET FRAME ****************"
+    print "Dest MAC:        ", binascii.hexlify(eth_detailed[0])
+    print "Source MAC:      ", binascii.hexlify(eth_detailed[1])
+    print "Type:            ", binascii.hexlify(eth_detailed[2])
+    print "************************************************"
+    print "**************** IP HEADER *********************"
+    print "Version/IHL:     ", binascii.hexlify(ip_detailed[0])
+    print "Type of service: ", binascii.hexlify(ip_detailed[1])
+    print "Length:          ", binascii.hexlify(ip_detailed[2])
+    print "Identification:  ", binascii.hexlify(ip_detailed[3])
+    print "Flags/offset:    ", binascii.hexlify(ip_detailed[4])
+    print "Time to Live:    ", binascii.hexlify(ip_detailed[5])
+    print "Protocol:        ", binascii.hexlify(ip_detailed[6])
+    print "Checksum:        ", binascii.hexlify(ip_detailed[7])
+    print "Source IP:       ", socket.inet_ntoa(ip_detailed[8])
+    print "Dest IP:         ", socket.inet_ntoa(ip_detailed[9])
+    print "************************************************"
+    print "****************** ICMP HEADER *****************"
+    print "Type of Msg:     ", binascii.hexlify(icmp_detailed[0])
+    print "Code:            ", binascii.hexlify(icmp_detailed[1])
+    print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
+    print "Header data:     ", binascii.hexlify(icmp_detailed[3])
+    print "************************************************\n"
     return new_icmp_packet
+
+# Don't forget to clear out checksum in header before calculating checksum at any point
+def ip_checksum(ip_header, size):
+    
+    cksum = 0
+    pointer = 0
+    
+    hexed = binascii.hexlify(ip_header)
+    stringVersion = hexed.decode()
+    
+    #The main loop adds up each set of 2 bytes. They are first converted to strings and then concatenated
+    #together, converted to integers, and then added to the sum.
+    while size > 1:
+        cksum += int(stringVersion[pointer] + stringVersion[pointer + 1], 16)
+        size -= 2
+        pointer += 2
+    if size: #This accounts for a situation where the header is odd
+        cksum += int(stringVersion[pointer], 16)
+        
+    cksum = (cksum >> 16) + (cksum & 0xffff)
+    cksum += (cksum >>16)
+    
+    return (~cksum) & 0xFFFF
+    
+def decrementTTL(binaryTTL):
+    ''' Convert TTL to int, decrement by 1, and then turn it back into 8 bit padded binary '''
+    intTTL = int(binascii.hexlify(binaryTTL), 16)
+    intTTL = intTTL - 1
+    return binascii.unhexlify(hex(intTTL)[2:].zfill(8))
 
 def main(argv):
 
@@ -466,54 +495,56 @@ def main(argv):
         # Receive packets with a buffer size of 1024 bytes
         packet = s.recvfrom(1024)
 
-        # Packet handling logic
-        isArpPacket = checkIsArpPacket(packet)
-        if(isArpPacket):
-            returnVal = processArpPacket(packet)
-            if(returnVal is not None):
-                # send new packet to addr received from old packet
-                s.sendto(new_packet, packet[1])
-                continue
-        # Parse the ethernet header
-        eth_header = packet[0][0:14]
-    
-        eth_detailed = struct.unpack("!6s6s2s", eth_header)
-        
         arp_header = packet[0][14:42]
         arp_detailed = struct.unpack("!2s2s1s1s2s6s4s6s4s", arp_header)
 
         # skip non-ARP packets
         eth_type = eth_detailed[2]
-
         
-        if eth_type != '\x08\x06':
+        # Packet handling logic
+        isArpPacket = checkIsArpPacket(packet)
+        if(isArpPacket):
+            returnVal = processArpPacket(packet)
+            # Send arp reply
+            if(returnVal is not None):
+                # send new packet to addr received from old packet
+                s.sendto(new_packet, packet[1])
+                continue
+            continue
+        if not isArpPacket:
             
-            #icmp_packet = s.recvfrom(2048)
-
-            icmp_packet = packet
-
-            eth_header = icmp_packet[0][0:14]
+            # Parse the ethernet header
+            eth_header = packet[0][0:14]
             eth_detailed = struct.unpack("!6s6s2s", eth_header)
-
-            ip_header = icmp_packet[0][14:34]
+            
+            ip_header = packet[0][14:34]
             ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
             #ip_ver, ip_type, ip_len, ip_id, ip_flags, ip_ttl, ip_proto, \
             #    ip_checksum, ip_srcIP, ip_destIP = struct.unpack("!BBHHHBBHII", ip_header)
 
-            icmp_header = icmp_packet[0][34:42]
-            icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
+            #icmp_header =  packet[0][34:42]
+            #icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
             #icmp_type, icmp_code, icmp_checksum, icmp_id, icmp_seq = struct.unpack("bbHHh", icmp_header)
-			ip_ver_length = ip_detailed[0]
+            
+            ip_ver_length = ip_detailed[0]
+            ip_ver = binascii.hexlify(ip_ver_length).decode()[0]
             ip_type = ip_detailed[1]
             ip_protocol = ip_detailed[6]
-			# Figure out how to check for ipv4 in the ip_ver_length...
-            if ip_type == '\x00' and ip_protocol == '\x01':
-            
-                returnVal = processICMPPacket(icmp_packet)
+            # This should hopefully work for checking for any ipv4 packet
+            if ip_ver == '4':
+                # Step 1: Verify checksum
                 
-                #print len(icmp_packet[0]), len(new_icmp_packet)
-
-                s.sendto(returnVal, icmp_packet[1])
+                # Step 2: Decrement the TTL, if it becomes zero from this send an ICMP time exceeded packet and drop original packet
+                # Otherwise recompute checksum due to new TTL
+                
+                # Step 3...
+                # If this IPv4 packet is of protocol ICMP
+                if ip_protocol == '\x01':
+                    returnVal = processICMPPacket(icmp_packet)
+                    s.sendto(returnVal, icmp_packet[1])
+                else:
+                    # TODO: make this function
+                    #forwardIPv4Packet()
 
 if __name__ == "__main__":
     global isRouterOne
