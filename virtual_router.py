@@ -503,10 +503,10 @@ def main(argv):
             icmp_header = icmp_packet[0][34:42]
             icmp_detailed = struct.unpack("1s1s2s4s", icmp_header)
             #icmp_type, icmp_code, icmp_checksum, icmp_id, icmp_seq = struct.unpack("bbHHh", icmp_header)
-
+			ip_ver_length = ip_detailed[0]
             ip_type = ip_detailed[1]
             ip_protocol = ip_detailed[6]
-            
+			# Figure out how to check for ipv4 in the ip_ver_length...
             if ip_type == '\x00' and ip_protocol == '\x01':
             
                 returnVal = processICMPPacket(icmp_packet)
