@@ -442,7 +442,7 @@ def forwardIPv4Packet(packet):
         return (TTL_ERROR, struct.pack('6s6s2s', *tuple(eth_detailed)) + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + createICMPTimeExceeded(original_ip_header, packet[0][34:43]))
     
     # Return a packet pre-arp request
-    return (socket.inet_ntoa(ip_detailed[9]), packet[0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + packet[34:])
+    return (socket.inet_ntoa(ip_detailed[9]), (packet[0][0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *ip_detailed) + packet[0][34:]))
 
 def createICMPTimeExceeded(ip_packet, data):
     icmp_type = b'\x0B'
@@ -664,9 +664,9 @@ def main(argv):
                         result = (result[0], struct.pack("6s6s2s", *tuple(eth_detailed)) + result[14:])
                         # If we have the IP addressed cached forward it via routing lookup
                         if(isRouterOne):
-                            nextHop = findNextHop(listIP1, socket.inet_ntoa(result[0]))
+                            nextHop = findNextHop(listIP1, result[0])
                         else:
-                            nextHop = findNextHop(listIP2, socket.inet_ntoa(result[0]))
+                            nextHop = findNextHop(listIP2, result[0])
                         if(nextHop is not None):
                             if(isRouterOne):
                                 for socket1 in r1SendSockets:
@@ -686,9 +686,9 @@ def main(argv):
                         #waitingIPv4Packets.append(result)
                         # Make the ARP request
                         if(isRouterOne):
-                            nextHop = findNextHop(listIP1, socket.inet_ntoa(result[0]))
+                            nextHop = findNextHop(listIP1, result[0])
                         else:
-                            nextHop = findNextHop(listIP2, socket.inet_ntoa(result[0]))
+                            nextHop = findNextHop(listIP2, result[0])
                         if(nextHop is not None):
                             if(isRouterOne):
                                 ethSourceMAC = eth_detailed[0]
@@ -737,9 +737,9 @@ def unreachable(args):
     else: 
         # If we have the IP addressed cached forward it via routing lookup
         if(isRouterOne):
-            nextHop = findNextHop(listIP1, socket.inet_ntoa(args[0]))
+            nextHop = findNextHop(listIP1, args[0])
         else:
-            nextHop = findNextHop(listIP2, socket.inet_ntoa(args[0]))
+            nextHop = findNextHop(listIP2, args[0])
         if(nextHop is not None):
             if(isRouterOne):
                 for socket1 in r1SendSockets:
