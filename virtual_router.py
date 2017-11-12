@@ -166,11 +166,12 @@ def processArpPacket(packet):
         return None
     # If we are router 2 and destination IP of arp is not us continue
     router2List = ['10.3.0.1', '10.3.1.1', '10.3.4.1', '10.0.0.2']
-    if(not isRouterOne and socket.inet_ntoa(arp_detailed[8]) not in router2List ):
+    if(not isRouterOne and socket.inet_ntoa(arp_detailed[8]) not in router2List):
         return None    
     # If this is an ARP reply packet
     if arp_detailed[4] == '\x00\x02':
         print "MAC ADDRESS OF THE OTHER SIDE: " + binascii.hexlify(arp_detailed[5])
+        # Map IP to MAC 
         IPToMACMap[socket.inet_ntoa(arp_detailed[6])] = binascii.hexlify(arp_detailed[5])
         return None
         
@@ -243,7 +244,7 @@ def processArpPacket(packet):
     return new_packet
 
     
-def processICMPPacket(packet): 
+def processICMPPacketToRouter(icmp_packet): 
 
     eth_header = icmp_packet[0][0:14]
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
@@ -292,7 +293,7 @@ def processICMPPacket(packet):
     print "Header data:     ", binascii.hexlify(icmp_detailed[3])
     print "************************************************\n"    
     
-    # Check if we need to ARP request against the other router
+    '''# Check if we need to ARP request
     if(isRouterOne):
         nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
     else:
@@ -320,7 +321,7 @@ def processICMPPacket(packet):
             for socket2 in r2SendSockets:
                 # If socket interface == next hop interface
                 if socket2[1] == nextHop[1]:
-                    socket2[0].send(arpPacket)
+                    socket2[0].send(arpPacket)'''
     
     #continue
     # tuples are immutable in python, copy to list
@@ -336,7 +337,7 @@ def processICMPPacket(packet):
     new_eth_detailed_list[0] = eth_detailed[1]
     new_eth_detailed_list[1] = eth_detailed[0]
     
-    # change type of msg
+    # change type of ICMP to reply
     new_icmp_detailed_list[0] = '\x00'
     
     # cast back to tuple -- might not be needed?
@@ -388,7 +389,22 @@ def processICMPPacket(packet):
     print "Checksum:        ", binascii.hexlify(icmp_detailed[2])
     print "Header data:     ", binascii.hexlify(icmp_detailed[3])
     print "************************************************\n"
+    
     return new_icmp_packet
+
+def forwardIPv4Packet(packet):
+    ip_header = packet[0][14:34]
+    ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
+    
+    # Check checksum in packet
+    
+    # Check TTL
+    ttlResult = decrementTTL(ip_detailed[5])
+    if(ttlResult not None):
+        ip_detailed[5] = ttlResult
+    else:
+        # TODO: Need to send a ICMP time exceeded here or return the ICMP time exceeded packet
+    return
 
 # Don't forget to clear out checksum in header before calculating checksum at any point
 def ip_checksum(ip_header, size):
@@ -417,7 +433,10 @@ def decrementTTL(binaryTTL):
     ''' Convert TTL to int, decrement by 1, and then turn it back into 8 bit padded binary '''
     intTTL = int(binascii.hexlify(binaryTTL), 16)
     intTTL = intTTL - 1
-    return binascii.unhexlify(hex(intTTL)[2:].zfill(8))
+    if(intTTL == 0):
+        return None
+    else:
+        return binascii.unhexlify(hex(intTTL)[2:].zfill(8))
 
 def main(argv):
 
@@ -532,19 +551,21 @@ def main(argv):
             ip_protocol = ip_detailed[6]
             # This should hopefully work for checking for any ipv4 packet
             if ip_ver == '4':
-                # Step 1: Verify checksum
                 
-                # Step 2: Decrement the TTL, if it becomes zero from this send an ICMP time exceeded packet and drop original packet
-                # Otherwise recompute checksum due to new TTL
-                
-                # Step 3...
-                # If this IPv4 packet is of protocol ICMP
-                if ip_protocol == '\x01':
-                    returnVal = processICMPPacket(icmp_packet)
-                    s.sendto(returnVal, icmp_packet[1])
-                else:
-                    # TODO: make this function
-                    #forwardIPv4Packet()
+                #Check if packet is for us
+                router1List = ['10.1.0.1', '10.1.1.1', '10.0.0.1']
+                router2List = ['10.3.0.1', '10.3.1.1', '10.3.4.1', '10.0.0.2']
+                # Check if this packet is for us or not and process it, (we only care to process icmp for us)
+                if((isRouterOne and socket.inet_ntoa(arp_detailed[8]) in router1List) 
+                or (not isRouterOne and socket.inet_ntoa(arp_detailed[8]) in router2List)):
+                    # IP Protocol is ICMP
+                    if ip_protocol == '\x01':
+                        returnVal = processICMPPacketToRouter(packet)
+                        s.sendto(returnVal, packet[1]) 
+                        continue
+                    
+                # If we reached here the packet wasn't for us so forward it
+                forwardIPv4Packet(packet)
 
 if __name__ == "__main__":
     global isRouterOne
