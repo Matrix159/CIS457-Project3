@@ -397,6 +397,8 @@ def processICMPPacketToRouter(icmp_packet):
     return new_icmp_packet
 
 def forwardIPv4Packet(packet):
+    if(packet[1][0] == 'lo'):
+	return None
     eth_header = packet[0][0:14]
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
     
@@ -407,11 +409,12 @@ def forwardIPv4Packet(packet):
     # Check checksum in packet
     copy = list(ip_detailed)
     copy[7] = '\x00\x00'
-    if(ip_detailed[7] != checksum(copy, len(copy))):
-        return None
+    copy = struct.pack("1s1s2s2s2s1s1s2s4s4s", *copy)
+    #if(ip_detailed[7] != checksum(copy, len(copy))):
+       # return None
     # Check TTL
     ttlResult = decrementTTL(ip_detailed[5])
-    if(ttlResult not None):
+    if(ttlResult is not None):
         # New TTL
         ip_detailed[5] = ttlResult
         # Recalculated checksum
@@ -604,7 +607,7 @@ def main(argv):
             # Send arp reply
             if(returnVal is not None):
                 # send new packet to addr received from old packet
-                s.sendto(new_packet, packet[1])
+                s.sendto(returnVal, packet[1])
                 continue
             continue
         if not isArpPacket:
@@ -751,7 +754,6 @@ def unreachable(args):
     # send on socket args[0]
 
 if __name__ == "__main__":
-    global isRouterOne
     if(len(sys.argv) != 2):
         print "Incorrect command line argument length."
     if(sys.argv[1] == "r1"):
