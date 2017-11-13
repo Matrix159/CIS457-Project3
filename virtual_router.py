@@ -8,7 +8,8 @@ import socket, os, sys
 import netifaces
 import struct
 import binascii
-import time
+import threading
+from threading import Timer
 from uuid import getnode as get_mac #to get mac address
 
 
@@ -625,10 +626,21 @@ def main(argv):
                 elif(result[0] == TTL_ERROR):
                     s.sendto(result[1], packet[1])
                 else:
-                     '''import time, threading
-                     >>> def foo():
-                     ...     list.append("hi")
-                     ...     threading.Timer(10,foo).start()'''
+                    # Try to connect to the client, if after 10 second we still haven't responded, return host unreachable
+                    socket_name = [socket]
+
+                    timer = Timer(10, timeout, socket_name) 
+                    timer.start()
+                    
+                    # if by the end of our checking we don't find what we need, it'll time out
+                    # if we do, use timer.cancel() to abort the unreachable packet
+
+                    # Found the host, cancel the time and send the packet?
+                    timer.cancel() 
+                    
+def timeout(args):
+    # Send error on the arp request
+    # send on socket args[0]
 
 if __name__ == "__main__":
     global isRouterOne
@@ -642,6 +654,5 @@ if __name__ == "__main__":
         isRouterOne = False
         getRoutingList(False)
         main(sys.argv)
- 
-    
-    
+  
+   
