@@ -22,6 +22,9 @@ r1IPList = []
 r2IPList = []
 IPToMACMap = {}
 
+TTL_ERROR = 0
+UNREACHABLE_ERROR = 1
+
 def macToBinary(mac):
     """Convert MAC address to binary."""
     return binascii.unhexlify(mac.replace(':', ''))
@@ -397,11 +400,12 @@ def forwardIPv4Packet(packet):
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
     ip_header = packet[0][14:34]
     ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_header)
-    
+    original_ip_header = ip_header
+
     # Check checksum in packet
     copy = list(ip_detailed)
     copy[7] = '\x00\x00'
-    if(ip_detailed[7] != ip_checksum(copy, len(copy))):
+    if(ip_detailed[7] != checksum(copy, len(copy))):
         return None
     # Check TTL
     ttlResult = decrementTTL(ip_detailed[5])
@@ -409,7 +413,7 @@ def forwardIPv4Packet(packet):
         # New TTL
         ip_detailed[5] = ttlResult
         # Recalculated checksum
-        ip_detailed[7] = ip_checksum(copy, len(copy))
+        ip_detailed[7] = checksum(copy, len(copy))
     else:
         # Create the time exceeded ICMP message
         # Swap the MAC addresses
@@ -428,27 +432,35 @@ def forwardIPv4Packet(packet):
         #recalculate ip checksum 
         copy = list(ip_detailed)
         copy[7] = '\x00\x00'
-        ip_detailed[7] = ip_checksum(copy, len(copy))
-        return struct.pack('6s6s2s', *tuple(eth_detailed)) + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + createICMPTimeExceeded()
+        ip_detailed[7] = checksum(copy, len(copy))
+        # Time exceeded error packet
+        return (TTL_ERROR, struct.pack('6s6s2s', *tuple(eth_detailed)) + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + createICMPTimeExceeded(original_ip_header, packet[0][34:43]))
     
     # Return a packet pre-arp request
-    return packet[0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + packet[34:]
+    return (None, packet[0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + packet[34:])
 
-def createICMPTimeExceeded():
+def createICMPTimeExceeded(ip_packet, data):
     icmp_type = b'\x0B'
     icmp_code = b'\x00'
     icmp_checksum = b'\x00\x00'
-    icmp_data = b'\x00\x00\x00\x00'
-    icmp_total = icmp_type + icmp_code + icmp_checksum + icmp_data
+    icmp_unused = b'\x00\x00\x00\x00'
+    icmp_total = icmp_type + icmp_code + icmp_checksum + icmp_unused + ip_packet + data
     icmp_checksum = ip_checksum(icmp_total, len(icmp_total))
-    return struct.pack('1s1s2s4s', icmp_type, icmp_code, icmp_checksum, icmp_data)
+    
+    return struct.pack('1s1s2s4s20s8s', icmp_type, icmp_code, icmp_checksum, icmp_unused, ip_packet, data)
 
-def createICMPUnreachable():
-    # TODO
-    return
+def createICMPUnreachable(ip_packet, data):
+    icmp_type = b'\x03'
+    icmp_code = b'\x01'
+    icmp_checksum = b'\x00\x00'
+    icmp_unused = b'\x00\x00\x00\x00'
+    icmp_total = icmp_type + icmp_code + icmp_checksum + icmp_unused + ip_packet + data
+    icmp_checksum = ip_checksum(icmp_total, len(icmp_total))
+    
+    return struct.pack('1s1s2s4s20s8s', icmp_type, icmp_code, icmp_checksum, icmp_unused, ip_packet, data)
 
 # Don't forget to clear out checksum in header before calculating checksum at any point
-def ip_checksum(ip_header, size):
+def checksum(ip_header, size):
     
     cksum = 0
     pointer = 0
@@ -607,10 +619,16 @@ def main(argv):
                     
                 # If we reached here the packet wasn't for us so forward it
                 result = forwardIPv4Packet(packet)
+                # Result of None is a bad checksum so discard.
                 if(result is None):
                     continue
+                elif(result[0] == TTL_ERROR):
+                    s.sendto(result[1], packet[1])
                 else:
-                    # Do more stuff
+                     '''import time, threading
+                     >>> def foo():
+                     ...     list.append("hi")
+                     ...     threading.Timer(10,foo).start()'''
 
 if __name__ == "__main__":
     global isRouterOne
