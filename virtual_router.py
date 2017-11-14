@@ -401,11 +401,11 @@ def forwardIPv4Packet(packet):
 	return None
     eth_header = packet[0][0:14]
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
-    
+    eth_detailed = list(eth_detailed)
     ip_header = packet[0][14:34]
     ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_header)
     original_ip_header = ip_header
-
+    ip_detailed = list(ip_detailed)
     # Check checksum in packet
     copy = list(ip_detailed)
     copy[7] = '\x00\x00'
@@ -463,7 +463,7 @@ def createICMPUnreachable(eth_destination, eth_source, ip_packet, source_ip, des
     
     ip_header = packet[0][14:34]
     ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_header)
-    
+    ip_detailed = list(ip_detailed)
     # TTL to 64
     ip_detailed[5] = '\x40'
     # Protocol to 1 for ICMP
@@ -657,6 +657,7 @@ def main(argv):
                         # Set the MAC addresses
                         eth_header = result[0:14]
                         eth_detailed = struct.unpack("!6s6s2s", eth_header)
+                        eth_detailed = list(eth_detailed)
                         temp = eth_detailed[0]
                         eth_detailed[0] = IPToMACMap[result[0]]
                         eth_detailed[1] = temp
