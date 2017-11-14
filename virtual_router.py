@@ -22,7 +22,7 @@ r2SendSockets = []
 r1IPList = []
 r2IPList = []
 IPToMACMap = {}
-
+waitingIPv4Packets = []
 TTL_ERROR = 0
 UNREACHABLE_ERROR = 1
 
@@ -397,8 +397,9 @@ def processICMPPacketToRouter(icmp_packet):
     return new_icmp_packet
 
 def forwardIPv4Packet(packet):
-    eth_header = icmp_packet[0][0:14]
+    eth_header = packet[0][0:14]
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
+    
     ip_header = packet[0][14:34]
     ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_header)
     original_ip_header = ip_header
@@ -438,7 +439,7 @@ def forwardIPv4Packet(packet):
         return (TTL_ERROR, struct.pack('6s6s2s', *tuple(eth_detailed)) + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + createICMPTimeExceeded(original_ip_header, packet[0][34:43]))
     
     # Return a packet pre-arp request
-    return (None, packet[0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + packet[34:])
+    return (socket.inet_ntoa(ip_detailed[9]), packet[0:14] + struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed)) + packet[34:])
 
 def createICMPTimeExceeded(ip_packet, data):
     icmp_type = b'\x0B'
@@ -450,7 +451,28 @@ def createICMPTimeExceeded(ip_packet, data):
     
     return struct.pack('1s1s2s4s20s8s', icmp_type, icmp_code, icmp_checksum, icmp_unused, ip_packet, data)
 
-def createICMPUnreachable(ip_packet, data):
+def createICMPUnreachable(eth_destination, eth_source, ip_packet, source_ip, destination_ip, data):
+
+    eth_type = b'\x08\x00'
+    eth_packed = struct.pack("6s6s2s", eth_destination, eth_source, eth_type)
+    
+    ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_packet)
+    
+    ip_header = packet[0][14:34]
+    ip_detailed = struct.unpack("!1s1s2s2s2s1s1s2s4s4s", ip_header)
+    
+    # TTL to 64
+    ip_detailed[5] = '\x40'
+    # Protocol to 1 for ICMP
+    ip_detailed[6] = '\x01'
+    ip_detailed[7] = '\x00\x00'
+    ip_detailed[8] = source_ip
+    ip_detailed[9] = destination_ip
+    checksum_packed = struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed))
+    ip_detailed[7] = checksum(checksum_packed, len(checksum_packed))
+    
+    ip_packed = struct.pack("1s1s2s2s2s1s1s2s4s4s", *tuple(ip_detailed))
+    
     icmp_type = b'\x03'
     icmp_code = b'\x01'
     icmp_checksum = b'\x00\x00'
@@ -458,7 +480,7 @@ def createICMPUnreachable(ip_packet, data):
     icmp_total = icmp_type + icmp_code + icmp_checksum + icmp_unused + ip_packet + data
     icmp_checksum = ip_checksum(icmp_total, len(icmp_total))
     
-    return struct.pack('1s1s2s4s20s8s', icmp_type, icmp_code, icmp_checksum, icmp_unused, ip_packet, data)
+    return eth_packed + ip_packed + struct.pack('1s1s2s4s20s8s', icmp_type, icmp_code, icmp_checksum, icmp_unused, ip_packet, data)
 
 # Don't forget to clear out checksum in header before calculating checksum at any point
 def checksum(ip_header, size):
@@ -500,7 +522,8 @@ def main(argv):
     global listIP2
     global r1SendSockets
     global r2SendSockets
-
+    global IPToMACMap
+    global waitingIPv4Packets
     try: 
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x003))
         print "Socket successfully created."
@@ -610,8 +633,8 @@ def main(argv):
                 router1List = ['10.1.0.1', '10.1.1.1', '10.0.0.1']
                 router2List = ['10.3.0.1', '10.3.1.1', '10.3.4.1', '10.0.0.2']
                 # Check if this packet is for us or not and process it, (we only care to process icmp for us)
-                if((isRouterOne and socket.inet_ntoa(arp_detailed[8]) in router1List) 
-                or (not isRouterOne and socket.inet_ntoa(arp_detailed[8]) in router2List)):
+                if((isRouterOne and socket.inet_ntoa(ip_detailed[9]) in router1List) 
+                or (not isRouterOne and socket.inet_ntoa(ip_detailed[9]) in router2List)):
                     # IP Protocol is ICMP
                     if ip_protocol == '\x01':
                         returnVal = processICMPPacketToRouter(packet)
@@ -626,19 +649,104 @@ def main(argv):
                 elif(result[0] == TTL_ERROR):
                     s.sendto(result[1], packet[1])
                 else:
-                    # Try to connect to the client, if after 10 second we still haven't responded, return host unreachable
-                    socket_name = [socket]
+                    if(result[0] in IPToMACMap):
+                        
+                        # Set the MAC addresses
+                        eth_header = result[0:14]
+                        eth_detailed = struct.unpack("!6s6s2s", eth_header)
+                        temp = eth_detailed[0]
+                        eth_detailed[0] = IPToMACMap[result[0]]
+                        eth_detailed[1] = temp
+                        result = (result[0], struct.pack("6s6s2s", *tuple(eth_detailed)) + result[14:])
+                        # If we have the IP addressed cached forward it via routing lookup
+                        if(isRouterOne):
+                            nextHop = findNextHop(listIP1, socket.inet_ntoa(result[0]))
+                        else:
+                            nextHop = findNextHop(listIP2, socket.inet_ntoa(result[0]))
+                        if(nextHop is not None):
+                            if(isRouterOne):
+                                for socket1 in r1SendSockets:
+                                    # If socket interface == next hop interface
+                                    if socket1[1] == nextHop[1]:
+                                        socket1[0].send(result)
+                            else:
+                                for socket2 in r2SendSockets:
+                                    # If socket interface == next hop interface
+                                    if socket2[1] == nextHop[1]:
+                                        socket2[0].send(result)
+                        else:
+                            # If for some reason the next hop is None...
+                            unreachablePacket = createICMPUnreachable(packet[0][6:12], packet[0][0:6], packet[0][14:34], struct.pack('4s', ip_detailed[9]) , struct.pack('4s', ip_detailed[8]), packet[0][34:43])
+                            s.sendto(unreachablePacket, packet[1])
+                    else:  
+                        #waitingIPv4Packets.append(result)
+                        # Make the ARP request
+                        if(isRouterOne):
+                            nextHop = findNextHop(listIP1, socket.inet_ntoa(result[0]))
+                        else:
+                            nextHop = findNextHop(listIP2, socket.inet_ntoa(result[0]))
+                        if(nextHop is not None):
+                            if(isRouterOne):
+                                ethSourceMAC = eth_detailed[0]
+                                arpSourceMAC = ethSourceMAC
+                                
+                                # Get the destination IP via interface
+                                addr = netifaces.ifaddresses(nextHop[1])[2][0]['addr']
 
-                    timer = Timer(10, timeout, socket_name) 
-                    timer.start()
-                    
-                    # if by the end of our checking we don't find what we need, it'll time out
-                    # if we do, use timer.cancel() to abort the unreachable packet
+                                arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(addr), socket.inet_aton(nextHop[0]))
+                                for socket1 in r1SendSockets:
+                                    # If socket interface == next hop interface
+                                    if socket1[1] == nextHop[1]:
+                                        socket1[0].send(arpPacket)
+                            else:
+                                ethSourceMAC = eth_detailed[0]
+                                arpSourceMAC = ethSourceMAC
+                                
+                                # Get the destination IP via interface
+                                addr = netifaces.ifaddresses(nextHop[1])[2][0]['addr']
 
-                    # Found the host, cancel the time and send the packet?
-                    timer.cancel() 
+                                arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(addr), socket.inet_aton(nextHop[0]))
+                                for socket2 in r2SendSockets:
+                                    # If socket interface == next hop interface
+                                    if socket2[1] == nextHop[1]:
+                                        socket2[0].send(arpPacket)
+                        else:
+                            # If for some reason the next hop is None...
+                            unreachablePacket = createICMPUnreachable(packet[0][6:12], packet[0][0:6], packet[0][14:34], struct.pack('4s', ip_detailed[9]) , struct.pack('4s', ip_detailed[8]), packet[0][34:43])
+                            s.sendto(unreachablePacket, packet[1])
+
+                        #           Dest IP    Forward Packet   Original Packet
+                        argsList = [result[0], result[1], packet[0]]
+    
+                        timer = Timer(10, unreachable, argsList) 
+                        timer.start()
                     
-def timeout(args):
+def unreachable(args):
+    global IPToMACMap
+    global listIP1
+    global listIP2
+    if(args[0] not in IPToMACMap):
+        packet = args[2]
+        ip_header = packet[14:34]
+        ip_detailed = struct.unpack("1s1s2s2s2s1s1s2s4s4s", ip_header)
+        createICMPUnreachable(packet[6:12], packet[0:6], packet[14:34], struct.pack('4s', ip_detailed[9]) , struct.pack('4s', ip_detailed[8]), packet[34:43])
+    else: 
+        # If we have the IP addressed cached forward it via routing lookup
+        if(isRouterOne):
+            nextHop = findNextHop(listIP1, socket.inet_ntoa(args[0]))
+        else:
+            nextHop = findNextHop(listIP2, socket.inet_ntoa(args[0]))
+        if(nextHop is not None):
+            if(isRouterOne):
+                for socket1 in r1SendSockets:
+                    # If socket interface == next hop interface
+                    if socket1[1] == nextHop[1]:
+                        socket1[0].send(args[1])
+            else:
+                for socket2 in r2SendSockets:
+                    # If socket interface == next hop interface
+                    if socket2[1] == nextHop[1]:
+                        socket2[0].send(args[1])
     # Send error on the arp request
     # send on socket args[0]
 
