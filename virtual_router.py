@@ -297,35 +297,6 @@ def processICMPPacketToRouter(icmp_packet):
     print "Header data:     ", binascii.hexlify(icmp_detailed[3])
     print "************************************************\n"    
     
-    '''# Check if we need to ARP request
-    if(isRouterOne):
-        nextHop = findNextHop(listIP1, socket.inet_ntoa(ip_detailed[9]))
-    else:
-        nextHop = findNextHop(listIP2, socket.inet_ntoa(ip_detailed[9]))
-    if(nextHop is not None and nextHop[0] != "-"):
-        if(isRouterOne):
-            ethSourceMAC = eth_detailed[0]
-            arpSourceMAC = ethSourceMAC
-            
-            # TODO: Remove this hardcoded value, this can change based on what interface we are sending on
-            arpSourceIP = '10.0.0.1'
-            
-            arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
-            for socket1 in r1SendSockets:
-                # If socket interface == next hop interface
-                if socket1[1] == nextHop[1]:
-                    socket1[0].send(arpPacket)
-        else:
-            ethSourceMAC = eth_detailed[0]
-            arpSourceMAC = ethSourceMAC
-            # TODO: Remove this hardcoded value, this can change based on what interface we are sending on
-            arpSourceIP = '10.0.0.2'
-            
-            arpPacket = makeARPRequest(ethSourceMAC, arpSourceMAC, socket.inet_aton(arpSourceIP), socket.inet_aton(nextHop[0]))
-            for socket2 in r2SendSockets:
-                # If socket interface == next hop interface
-                if socket2[1] == nextHop[1]:
-                    socket2[0].send(arpPacket)'''
     
     #continue
     # tuples are immutable in python, copy to list
@@ -397,8 +368,7 @@ def processICMPPacketToRouter(icmp_packet):
     return new_icmp_packet
 
 def forwardIPv4Packet(packet):
-    if(packet[1][0] == 'lo'):
-	return None
+
     eth_header = packet[0][0:14]
     eth_detailed = struct.unpack("!6s6s2s", eth_header)
     eth_detailed = list(eth_detailed)
@@ -410,8 +380,8 @@ def forwardIPv4Packet(packet):
     copy = list(ip_detailed)
     copy[7] = '\x00\x00'
     copy = struct.pack("1s1s2s2s2s1s1s2s4s4s", *copy)
-    #if(ip_detailed[7] != checksum(copy, len(copy))):
-       # return None
+    if(ip_detailed[7] != checksum(copy, len(copy))):
+        return None
     # Check TTL
     ttlResult = decrementTTL(ip_detailed[5])
     if(ttlResult is not None):
